@@ -32,21 +32,10 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.IO;
 using System.Text; 
+using AssemblyCSharp;
 
 public class AvatarController : MonoBehaviour
-{	
-
-	
-	//Var interne mie per il movimento
-    private const int PiedeDx = 24;
-    private const int PiedeSx = 20;
-    private const int ManoDx = 15;
-    private const int ManoSx = 9;
-    private const int SpallaDx = 13;
-    private const int SpallaSx = 7;
-    private const int Testa = 1;
-	
-	
+{		
 	// Bool that determines whether the avatar is active.
 	public bool Active = true;
 	
@@ -55,6 +44,9 @@ public class AvatarController : MonoBehaviour
 	
 	// Bool that determines whether the avatar will move or not in space.
 	public bool MovesInSpace = false;
+
+    // Bool that determines whether the avatar will rotate with the shoulder.
+    public bool moveCameraShoulder = false;
 	
 	// Bool that determines whether the avatar is allowed to jump -- vertical movement
 	// can cause some models to behave strangely, so use at your own discretion.
@@ -112,9 +104,19 @@ public class AvatarController : MonoBehaviour
 	float XOffset, YOffset, ZOffset;
 	Quaternion originalRotation;
 	
-	
+    //Gesture
+    private GestureManager gManager = new GestureManager();
+	private bool initGesture = false;
+
+	// GUI Text to show messages.
+	public GameObject CalibrationText;
+
     public void Start()
-    {	
+    {
+        //creiamo il testo di info
+        
+        CalibrationText.guiText.text = "Inizio";
+
 		// Holds our bones for later.
 		bones = new Transform[(int)KinectWrapper.SkeletonJoint.END];
 		
@@ -133,7 +135,9 @@ public class AvatarController : MonoBehaviour
 	
 	// Update the avatar each frame.
     public void UpdateAvatar(uint UserID)
-    {	
+    {
+        //CalibrationText.guiText.text = "Inizio";
+
 		// If the movement is mirrored, update all bones normally.
 		if (MirroredMovement)
 		{
@@ -343,48 +347,93 @@ public class AvatarController : MonoBehaviour
 		
 	}
 	
+    //Funzione che gestisce l'avatar -> skeleton kinect
 	void MoveAvatar_my(uint UserID){
-
-		//X -> Sinistra Destra
-        //Y -> Altezza
-        //Z -> Avanti Dietro
-        KinectWrapper.SkeletonJointTransformation piedeDx = new KinectWrapper.SkeletonJointTransformation();
-        KinectWrapper.GetJointTransformation(UserID, KinectWrapper.SkeletonJoint.RIGHT_FOOT, ref piedeDx);
-
-        KinectWrapper.SkeletonJointTransformation piedeSx = new KinectWrapper.SkeletonJointTransformation();
-        KinectWrapper.GetJointTransformation(UserID, KinectWrapper.SkeletonJoint.LEFT_FOOT, ref piedeSx);
-		
-		//Rotazione
-        //Prendiamo le spalle
-        KinectWrapper.SkeletonJointTransformation spallaDx = new KinectWrapper.SkeletonJointTransformation();
-        KinectWrapper.GetJointTransformation(UserID, SpallaDx, ref spallaDx);
-        KinectWrapper.SkeletonJointTransformation spallaSx = new KinectWrapper.SkeletonJointTransformation();
-        KinectWrapper.GetJointTransformation(UserID, SpallaSx, ref spallaSx);
-
-        var dz = spallaDx.pos.z - spallaSx.pos.z;
-        var dx = spallaDx.pos.x - spallaSx.pos.x;
-        float angolo = (float)Math.Atan(dz / dx);
-        Debug.Log(angolo);
-
-        angolo = -angolo;
-
-        target.transform.Rotate(0, angolo * 3.0f, 0);
-		
-        float delta = 100f;
-		float dy = (piedeDx.pos.y - piedeSx.pos.y);
-        if (Math.Abs(dy) > delta)
+        //Inizializzazione delle gesture con la posizione iniziale del giocatore
+		if(!initGesture) {
+            gManager.Init(UserID);
+			initGesture = true;
+		}
+        //Giro il "target" in base all'angolo tra le spalle!
+        if (moveCameraShoulder)
         {
-            CharacterController controller = target.GetComponent<CharacterController>(); //GetComponent(CharacterController);
-			Debug.Log(dy);
-            //Traslazione
-            var avanti = target.transform.TransformDirection(Vector3.forward);
-            var curSpeed = 5f;
-            controller.SimpleMove(avanti * curSpeed);
+            KinectWrapper.SkeletonJointTransformation spallaDx = new KinectWrapper.SkeletonJointTransformation();
+            KinectWrapper.GetJointTransformation(UserID, KinectWrapper.SkeletonJoint.RIGHT_SHOULDER, ref spallaDx);
+            KinectWrapper.SkeletonJointTransformation spallaSx = new KinectWrapper.SkeletonJointTransformation();
+            KinectWrapper.GetJointTransformation(UserID, KinectWrapper.SkeletonJoint.LEFT_SHOULDER, ref spallaSx);
+
+            var dz = spallaDx.pos.z - spallaSx.pos.z;
+            var dx = spallaDx.pos.x - spallaSx.pos.x;
+            float angolo = (float)Math.Atan(dz / dx);
+           
+            angolo = -angolo; //Mirror
+            if (Math.Abs(angolo) > 0.2)
+            {
+                target.transform.Rotate(0, angolo * 3.0f, 0);
+            }
         }
 		
-		//x lato, y altezza, z profondità
-		//Debug.Log(piedeDx.pos.x.ToString() + "-" + piedeDx.pos.y + "-" + piedeDx.pos.z);
-		
+		Gesture.GestureState s;
+        s = gManager.getState();
+        string str = "";
+        CharacterController controller = target.GetComponent<CharacterController>();
+        var avanti = target.transform.TransformDirection(Vector3.forward);
+        float curSpeed = 0f;
+        if ((s & Gesture.GestureState.Camminata) != 0)
+        { 
+           curSpeed = 5f;
+           str += " camminata";
+        }
+        if ((s & Gesture.GestureState.Corsa) != 0)
+        {
+            curSpeed = 15f;
+            str += " corsa";
+        }
+        controller.SimpleMove(avanti * curSpeed);
+
+        if ((s & Gesture.GestureState.SpostamentoSX) != 0)
+        {
+            str += " Sinistra";
+        }
+        if ((s & Gesture.GestureState.SpostamentoDX) != 0)
+        {
+            str += " Destra";
+        }
+        if ((s & Gesture.GestureState.Salto) != 0)
+        {
+            str += " Salto";
+        }
+        if ((s & Gesture.GestureState.Piedi) != 0)
+        {
+            str += " Piedi";
+        }
+        if ((s & Gesture.GestureState.Seduto) != 0)
+        {
+            str += " Seduto";
+        }
+        if ((s & Gesture.GestureState.Indietro) != 0)
+        {
+            str += " Indietro";
+        }
+        if ((s & Gesture.GestureState.Cintura) != 0)
+        {
+            str += " Cintura";
+        }
+        if ((s & Gesture.GestureState.PosizioneSicurezza) != 0)
+        {
+            str += " Sicurezza";
+        }
+        if ((s & Gesture.GestureState.Gattoni) != 0)
+        {
+            str += " Gattoni";
+        }
+        if ((s & Gesture.GestureState.Maschera) != 0)
+        {
+            str += " Maschera";
+        }
+
+        CalibrationText.guiText.text = str;
+        
 	}
 	
 	// If the bones to be mapped have been declared, map that bone to the model.

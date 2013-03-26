@@ -65,7 +65,9 @@ public class KinectManager : MonoBehaviour
 	
 	// List of all users
 	List<uint> allUsers;
-	
+
+    GameObject txtTest;
+
 	// Add model to player list.
 	void AddAvatar(GameObject avatar, List<GameObject> whichPlayerList)
 	{
@@ -100,6 +102,7 @@ public class KinectManager : MonoBehaviour
     void OnCalibrationStarted(uint UserId)
     {
 		Debug.Log(String.Format("[{0}] Calibration started", UserId));
+        txtTest.guiText.text = "Rimani in questa posa senza muoverti!";
     }
 	
 	// Alert us when the calibration fails.
@@ -244,7 +247,10 @@ public class KinectManager : MonoBehaviour
 		Debug.Log("Waiting for users to calibrate");
 		
 		// Set the default smoothing for the Kinect.
-		KinectWrapper.SetSkeletonSmoothing(0.6);		
+		KinectWrapper.SetSkeletonSmoothing(0.6);
+
+        // GUI Text.
+        txtTest = GameObject.Find("txtTest");
 		
 	}
 	

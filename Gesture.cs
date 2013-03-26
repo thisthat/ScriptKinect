@@ -1,7 +1,6 @@
 using System;
 
-namespace AssemblyCSharp
-{
+
 	public abstract class Gesture
 	{
 		public enum GestureState {
@@ -15,12 +14,11 @@ namespace AssemblyCSharp
 			Salto = 64,
 			SpostamentoSX = 128,
 			SpostamentoDX = 256,
-			Maschera = 515,
+			Maschera = 512,
 			PosizioneSicurezza = 1024,
 			Cintura = 2048
 		};
 		
-		public abstract GestureState transazione(KinectWrapper.SkeletonJointTransformation sk);
+		public abstract GestureState transazione();
 	}
-}
 
